@@ -10,6 +10,7 @@ def sql_start():
         print('База данных подключена!')
     cursor.execute('CREATE TABLE IF NOT EXISTS users (tg_id INTEGER, name_group TEXT)')
     cursor.execute('CREATE TABLE IF NOT EXISTS news (dt DATETIME, title TEXT, content TEXT, img TEXT)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS groups (name TEXT PRIMARY KEY, schedule TEXT)')
     base.commit()
 
 async def get_data_from_proxy(state):
@@ -27,4 +28,26 @@ async def get_news():
 async def delete_news(date):
     datetime_obj = datetime.strptime(date, '%Y-%m-%d %H:%M:%S.%f')
     cursor.execute('DELETE FROM news WHERE dt = ?', (datetime_obj,))
+    base.commit()
+
+async def get_all_groups():
+    return [_ for _ in cursor.execute('SELECT * FROM groups')]
+
+async def delete_group(name):
+    cursor.execute('DELETE FROM groups WHERE name = ?', (name,))
+    base.commit()
+
+
+async def add_group(name,msg):
+    try:
+        cursor.execute('INSERT INTO groups VALUES (?,?)', (name, None))
+        base.commit()
+    except IntegrityError:
+        bot.send_message(msg.chat.id,'Данный класс уже создан!')
+
+async def get_all_users():
+    return [u for u in cursor.execute('SELECT * FROM users')]
+
+async def change_user_group(user_id, group_name):
+    cursor.execute('UPDATE users SET name_group = ? WHERE tg_id = ?', (group_name, user_id))
     base.commit()

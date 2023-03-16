@@ -1,20 +1,53 @@
 from aiogram import types
+from keyboards import usually_kb
 from create_bot import bot,dp
 from handlers.states import NewsStates
 from aiogram.dispatcher import FSMContext
 from data_base import sqlite_db
 from keyboards import inline_kb, delete_kb
 from aiogram.dispatcher.filters import Text
+from handlers import states
 
 async def add_proxy_data(state,data):
     async with state.proxy() as proxy:
         for k,v in data.items():
             proxy[k] = v
 
+@dp.message_handler(commands=['delete_group'], is_chat_admin=True)
+async def delete_group_command(message: types.Message):
+    all_groups = await sqlite_db.get_all_groups()
+    group_kb = usually_kb.group_keyboard(all_groups)
+    await message.answer('Выберите класс, который хотите удалить:', reply=False,
+                         reply_markup=group_kb)
+    await states.DeleteGroupStates.group_name.set()
 
 
+@dp.message_handler(state=states.DeleteGroupStates.group_name)
+async def delete_group_state(message: types.Message, state: FSMContext):
+    all_groups_names = [name[0] for name in await sqlite_db.get_all_groups()]
+    if message.text in all_groups_names:
+        await sqlite_db.delete_group(message.text)
+        await message.reply('Класс удален.',reply=False,
+                            reply_markup=types.ReplyKeyboardRemove())
+    else:
+        await bot.send_message(message.chat.id,'Такого класса не существует.')
+    await state.finish()
 
-@dp.message_handler(commands=['create_news'])
+
+@dp.message_handler(commands=['create_group'], is_chat_admin=True)
+async def create_group_command(message: types.Message):
+    await message.reply('Введите название класса:')
+    await states.CreateGroupStates.group_name.set()
+
+
+@dp.message_handler(state=states.CreateGroupStates.group_name)
+async def create_group_state(message: types.Message, state: FSMContext):
+    await sqlite_db.add_group(message.text, message)
+    await message.reply('Группа создана!', reply=False)
+    await state.finish()
+
+
+@dp.message_handler(commands=['create_news'], is_chat_admin=True)
 async def create_news(message: types.Message):
     await NewsStates.title.set()
     await message.reply('Отправьте заголовок новости:', reply=False)
